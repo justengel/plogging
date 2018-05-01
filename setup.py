@@ -38,7 +38,7 @@ if __name__ == "__main__":
         url="https://github.com/HashSplat/plogging",
         download_url="https://github.com/HashSplat/plogging/archive/v1.0.0.tar.gz",
 
-        keywords=["logging", "process", "process logging", "parallel logging"],
+        keywords=["logging", "plogging", "process", "process logging", "parallel logging"],
 
         author="Justin Engel",
         author_email="jtengel08@gmail.com",
