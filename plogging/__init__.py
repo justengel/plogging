@@ -1,22 +1,59 @@
 import warnings
 from logging import *
 
-# Override getLogger
-from .log_process import *
-from .logger import *
+# ========== Override logging ==========
+from .log_process import is_parent_process_alive, run_process, stop_process
+from .logger import Logger
+from .manager import Manager
 from . import config
 from . import handlers
 
-# Override logging Config
+# ========== Override config ==========
 basicConfig = config.basicConfig
+CONFIGS = config.CONFIGS
+set_config_values = config.set_config_values
+set_config_function = config.set_config_function
 
-# Override logging handlers
+# ========== Override logging handlers ==========
 Handler = handlers.Handler
 StreamHandler = handlers.StreamHandler
 FileHandler = handlers.FileHandler
 NullHandler = handlers.NullHandler
 
 
+# ========== Manager ==========
+root = None
+Logger.manager = Manager(root)
+Logger.manager.setLoggerClass(Logger)
+setLoggerClass = Logger.manager.setLoggerClass
+
+
+def getLoggerClass():
+    """
+    Return the class to be used when instantiating a logger.
+    """
+    return Logger.manager.loggerClass
+
+
+def getLogger(name=None):
+    """
+    Return a logger with the specified name, creating it if necessary.
+
+    If no name is specified, return the root logger.
+    """
+    if not Logger.root:
+        global root
+        root = Logger('root')
+        Logger.root = root
+        Logger.manager.root = root
+
+    if name:
+        return Logger.manager.getLogger(name)
+    else:
+        return Logger.root
+
+
+# ========== Override root logging functions ==========
 # Custom standard format
 STANDARD_FMT = {'format': '%(asctime)s,%(msecs)d %(name)s %(levelname)s %(message)s',
                 'datefmt': '%m/%d/%Y %H:%M:%S',}
@@ -25,7 +62,6 @@ STANDARD_FORMATTER = {'fmt': STANDARD_FMT['format'],
                       'datefmt': STANDARD_FMT['datefmt']}
 
 
-# ========== Override root logging functions ==========
 def critical(msg, *args, **kwargs):
     """
     Log a message with severity 'CRITICAL' on the root logger. If the logger

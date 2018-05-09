@@ -33,10 +33,10 @@ if __name__ == "__main__":
 
     setup(
         name="plogging",
-        version="1.0.2",
+        version="1.0.3",
         description="Log data quickly with a separate process.",
         url="https://github.com/HashSplat/plogging",
-        download_url="https://github.com/HashSplat/plogging/archive/v1.0.2.tar.gz",
+        download_url="https://github.com/HashSplat/plogging/archive/v1.0.3.tar.gz",
 
         keywords=["logging", "plogging", "process", "process logging", "parallel logging"],
 

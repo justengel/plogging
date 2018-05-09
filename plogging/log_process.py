@@ -1,4 +1,5 @@
 import os
+
 import logging
 import logging.config
 
@@ -39,38 +40,75 @@ def stop_process(process, alive_event, process_queue):
         pass
 
 
-def run_process(alive_event, process_queue, name=None, basic_config=None, file_config=None, dict_config=None):
+def _run_configs(configs=None, config_funcs=None):
+    """Run the config for the given configurations.
+
+    Example:
+
+        def my_func(option1=None, option2=None):
+            print(option1, option2)
+
+        configs = {'my_config': (my_func, [], {'option1': 1, 'option2': 2})}
+        _run_configs(configs)
+
+    Args:
+        configs (dict)[None]: Dictionary of the configuration function and arguments.
+    """
+    if configs is None:
+        return
+
+    for opt, val in configs.items():
+        func, args, kwargs = val
+        if args or kwargs:
+            if isinstance(func, str):
+                func = getattr(logging, func, None)
+            if func:
+                func(*args, **kwargs)
+
+
+def _run_cmd(logger, cmd, args, kwargs):
+    """Get a command from the process queue and run the command with the logger.
+
+    Args:
+        logger (logging.Logger): Logger to run the command with
+        cmd (str): Logger method name to run
+        args (tuple): Positional arguments for the method
+        kwargs (dict): Key word arguments for the method.
+
+    Returns:
+        was_command (bool): True if the cmd name was a logger function.
+    """
+    if cmd == 'addHandler':
+        # Recreate the handler in this process (Handlers have a RLock which is not serializable/pickleable)
+        args = (args[0].create_handler(), ) + args[1:]
+
+    func = getattr(logger, cmd, None)
+    if func:
+        func(*args, **kwargs)
+        return True
+    return False
+
+
+def run_process(alive_event, process_queue, name=None, configs=None):
     """Run the logging commands in a separate process."""
-    # ===== Set the Configuration =====
-    if basic_config is not None:
-        logging.basicConfig(**basic_config)
-    if file_config is not None:
-        logging.config.fileConfig(*file_config)
-    if dict_config is not None:
-        logging.config.dictConfig(dict_config)
+    # ===== Configure logging =====
+    _run_configs(configs)
 
     # ===== get the logger =====
-    if name:
-        logger = logging.getLogger(name)
-    else:
+    if name == 'root':
         logger = logging.root
+    else:
+        logger = logging.getLogger(name)
 
     # ===== Run the logging event loop =====
     while alive_event.is_set() and is_parent_process_alive():
         cmd, args, kwargs = process_queue.get()
-        if cmd == 'addHandler':
-            # Recreate the handler in this process (Handlers have a RLock which is not serializable/pickleable)
-            args = (args[0].create_handler(), ) + args[1:]
-        if cmd != 'quit':
-            getattr(logger, cmd)(*args, **kwargs)
+        _run_cmd(logger, cmd, args, kwargs)
 
     # ===== Finish logging before closing =====
-    while not process_queue.empty():
+    # Only handle the number of events at this point. Otherwise could run forever if queue.put is fast enough.
+    for _ in range(process_queue.qsize()):
         cmd, args, kwargs = process_queue.get()
-        if cmd == 'addHandler':
-            # Recreate the handler in this process (Handlers have a RLock which is not serializable/pickleable)
-            args = (args[0].create_handler(), ) + args[1:]
-        if cmd != 'quit':
-            getattr(logger, cmd)(*args, **kwargs)
+        _run_cmd(logger, cmd, args, kwargs)
 
     alive_event.clear()
